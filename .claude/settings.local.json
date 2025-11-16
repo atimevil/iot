@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(uv --version:*)",
+      "Bash(claude mcp add-json:*)",
+      "Bash(claude mcp:*)",
+      "Bash(uvx:*)",
+      "Bash(chmod:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

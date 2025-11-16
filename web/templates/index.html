@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라즈베리 파이 게임 콘솔</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            font-size: 1.2em;
+            margin-bottom: 40px;
+        }
+
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .game-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        .game-card h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+
+        .game-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .difficulty-selector {
+            background: #f5f5f5;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .difficulty-selector label {
+            display: block;
+            color: #333;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .difficulty-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .difficulty-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .difficulty-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .difficulty-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .play-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .instructions {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .instructions h3 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+
+        .instructions ul {
+            list-style-position: inside;
+            color: #666;
+            line-height: 2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 라즈베리 파이 게임 콘솔</h1>
+        <p class="subtitle">IoT 시스템 응용 - 5조 팀 프로젝트</p>
+
+        <div class="games-grid">
+            <!-- Snake Game -->
+            <div class="game-card" id="snake-card">
+                <h2>🐍 Snake Game</h2>
+                <p>클래식 스네이크 게임! 먹이를 먹고 뱀을 키우세요. 자신의 몸이나 벽에 부딪히지 마세요!</p>
+
+                <div class="difficulty-selector">
+                    <label>난이도 선택:</label>
+                    <div class="difficulty-buttons">
+                        <button class="difficulty-btn" data-game="snake" data-difficulty="Easy">Easy</button>
+                        <button class="difficulty-btn active" data-game="snake" data-difficulty="Normal">Normal</button>
+                        <button class="difficulty-btn" data-game="snake" data-difficulty="Hard">Hard</button>
+                    </div>
+                </div>
+
+                <button class="play-btn" onclick="startGame('snake')">게임 시작</button>
+            </div>
+
+            <!-- Tetris Game -->
+            <div class="game-card" id="tetris-card">
+                <h2>🧱 Tetris</h2>
+                <p>테트리스 블록을 쌓아 줄을 완성하세요! 블록을 회전하고 이동하여 최고 점수에 도전하세요!</p>
+
+                <div class="difficulty-selector">
+                    <label>난이도 선택:</label>
+                    <div class="difficulty-buttons">
+                        <button class="difficulty-btn" data-game="tetris" data-difficulty="Easy">Easy</button>
+                        <button class="difficulty-btn active" data-game="tetris" data-difficulty="Normal">Normal</button>
+                        <button class="difficulty-btn" data-game="tetris" data-difficulty="Hard">Hard</button>
+                    </div>
+                </div>
+
+                <button class="play-btn" onclick="startGame('tetris')">게임 시작</button>
+            </div>
+
+            <!-- Flappy Bird Game -->
+            <div class="game-card" id="flappy-card">
+                <h2>🐦 Flappy Bird</h2>
+                <p>새를 조종하여 파이프 사이를 통과하세요! 타이밍에 맞춰 점프하여 최대한 오래 살아남으세요!</p>
+
+                <div class="difficulty-selector">
+                    <label>난이도 선택:</label>
+                    <div class="difficulty-buttons">
+                        <button class="difficulty-btn" data-game="flappy" data-difficulty="Easy">Easy</button>
+                        <button class="difficulty-btn active" data-game="flappy" data-difficulty="Normal">Normal</button>
+                        <button class="difficulty-btn" data-game="flappy" data-difficulty="Hard">Hard</button>
+                    </div>
+                </div>
+
+                <button class="play-btn" onclick="startGame('flappy')">게임 시작</button>
+            </div>
+        </div>
+
+        <div class="instructions">
+            <h3>📝 조작 방법</h3>
+            <ul>
+                <li><strong>Snake:</strong> 화살표 키 또는 리모컨 (2,4,6,8번)으로 이동</li>
+                <li><strong>Tetris:</strong> 화살표 좌/우로 이동, 위 화살표로 회전, 아래로 빠르게 낙하</li>
+                <li><strong>Flappy Bird:</strong> 스페이스 바 또는 리모컨 5번으로 점프</li>
+                <li><strong>공통:</strong> ESC 키로 게임 종료, R 키로 재시작</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Difficulty selection
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const game = this.dataset.game;
+                document.querySelectorAll(`.difficulty-btn[data-game="${game}"]`).forEach(b => {
+                    b.classList.remove('active');
+                });
+                this.classList.add('active');
+            });
+        });
+
+        function startGame(gameName) {
+            const activeBtn = document.querySelector(`.difficulty-btn[data-game="${gameName}"].active`);
+            const difficulty = activeBtn ? activeBtn.dataset.difficulty : 'Normal';
+
+            // Redirect to game page with difficulty parameter
+            window.location.href = `/game/${gameName}?difficulty=${difficulty}`;
+        }
+    </script>
+</body>
+</html>

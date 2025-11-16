@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Game</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.2em;
+        }
+
+        .score {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        canvas {
+            border: 3px solid #667eea;
+            border-radius: 10px;
+            background: #2c3e50;
+            display: block;
+            margin: 0 auto 20px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-home {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-reset {
+            background: #f39c12;
+            color: white;
+        }
+
+        .game-over {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .game-over h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+        }
+
+        .game-over.show {
+            display: block;
+        }
+
+        .instructions {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🧱 Tetris</h1>
+
+        <div class="game-info">
+            <div>난이도: <span id="difficulty" class="score">Normal</span></div>
+            <div>라인 클리어: <span id="score" class="score">0</span></div>
+        </div>
+
+        <canvas id="gameCanvas" width="400" height="800"></canvas>
+
+        <div class="controls">
+            <button class="btn-home" onclick="goHome()">홈으로</button>
+            <button class="btn-reset" onclick="resetGame()">재시작</button>
+        </div>
+
+        <div class="instructions">
+            <strong>조작:</strong> ← → 이동 | ↑ 회전 | ↓ 빠르게 낙하
+        </div>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h2>게임 오버!</h2>
+        <p>클리어한 라인: <span id="finalScore" class="score">0</span></p>
+        <button class="btn-reset" onclick="resetGame()" style="margin-top: 20px;">다시 시작</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const socket = io();
+
+        // Get difficulty from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const difficulty = urlParams.get('difficulty') || 'Normal';
+        document.getElementById('difficulty').textContent = difficulty;
+
+        const CELL_SIZE = 40;
+        let gameState = null;
+
+        // Tetromino colors
+        const COLORS = {
+            0: '#2c3e50',  // Empty
+            1: '#34495e',  // Locked block
+            2: '#e74c3c'   // Current piece
+        };
+
+        // Start game
+        socket.emit('start_game', { game: 'tetris', difficulty: difficulty });
+
+        // Receive game state updates
+        socket.on('game_state', function(state) {
+            gameState = state;
+            drawGame();
+
+            // Update score
+            document.getElementById('score').textContent = state.score;
+
+            // Show game over
+            if (state.game_over) {
+                document.getElementById('finalScore').textContent = state.score;
+                document.getElementById('gameOver').classList.add('show');
+            }
+        });
+
+        // Draw game
+        function drawGame() {
+            if (!gameState) return;
+
+            // Clear canvas
+            ctx.fillStyle = COLORS[0];
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw board
+            for (let y = 0; y < gameState.height; y++) {
+                for (let x = 0; x < gameState.width; x++) {
+                    const cell = gameState.board[y][x];
+
+                    if (cell === 1) {
+                        // Locked block
+                        ctx.fillStyle = '#3498db';
+                    } else if (cell === 2) {
+                        // Current piece
+                        ctx.fillStyle = '#e74c3c';
+                    } else {
+                        ctx.fillStyle = '#34495e';
+                    }
+
+                    ctx.fillRect(
+                        x * CELL_SIZE + 1,
+                        y * CELL_SIZE + 1,
+                        CELL_SIZE - 2,
+                        CELL_SIZE - 2
+                    );
+
+                    // Add shine effect for blocks
+                    if (cell > 0) {
+                        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                        ctx.fillRect(
+                            x * CELL_SIZE + 2,
+                            y * CELL_SIZE + 2,
+                            CELL_SIZE / 2,
+                            CELL_SIZE / 2
+                        );
+                    }
+                }
+            }
+
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= gameState.width; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * CELL_SIZE, 0);
+                ctx.lineTo(i * CELL_SIZE, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i <= gameState.height; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, i * CELL_SIZE);
+                ctx.lineTo(canvas.width, i * CELL_SIZE);
+                ctx.stroke();
+            }
+        }
+
+        // Handle keyboard input
+        document.addEventListener('keydown', function(event) {
+            let action = null;
+
+            switch(event.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    action = 'ROTATE';
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    action = 'DOWN';
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    action = 'LEFT';
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    action = 'RIGHT';
+                    break;
+                case 'Escape':
+                    goHome();
+                    return;
+                case 'r':
+                case 'R':
+                    resetGame();
+                    return;
+            }
+
+            if (action) {
+                event.preventDefault();
+                socket.emit('game_input', { game: 'tetris', action: action });
+            }
+        });
+
+        function resetGame() {
+            document.getElementById('gameOver').classList.remove('show');
+            socket.emit('reset_game');
+        }
+
+        function goHome() {
+            socket.emit('stop_game');
+            window.location.href = '/';
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            socket.emit('stop_game');
+        });
+    </script>
+</body>
+</html>
