@@ -44,6 +44,80 @@ if HARDWARE_AVAILABLE:
         ir_remote = None
 
 
+def handle_ir_button(button_name):
+    """Handle IR remote button press and send to game via WebSocket"""
+    global current_game
+
+    if not current_game:
+        return
+
+    print(f"[IR] Button pressed: {button_name}")
+
+    # Determine game type
+    game_type = None
+    if isinstance(current_game, SnakeGame):
+        game_type = 'snake'
+    elif isinstance(current_game, TetrisGame):
+        game_type = 'tetris'
+    elif isinstance(current_game, SuikaGame):
+        game_type = 'suika'
+
+    if not game_type:
+        return
+
+    # Map button to action based on game
+    action = None
+
+    if game_type == 'snake':
+        # Snake uses directional buttons
+        if button_name in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
+            action = button_name
+
+    elif game_type == 'tetris':
+        # Tetris: UP=rotate, DOWN=drop, LEFT/RIGHT=move
+        if button_name == 'UP':
+            action = 'ROTATE'
+        elif button_name in ['DOWN', 'LEFT', 'RIGHT']:
+            action = button_name
+
+    elif game_type == 'suika':
+        # Suika: LEFT/RIGHT=move, SELECT/DOWN=drop
+        if button_name in ['LEFT', 'RIGHT']:
+            action = button_name
+        elif button_name in ['SELECT', 'DOWN']:
+            action = 'SELECT'
+
+    # Send action to game
+    if action:
+        if game_type == 'snake':
+            current_game.change_direction(action)
+        elif game_type == 'tetris':
+            if action == 'LEFT':
+                current_game.move(-1, 0)
+            elif action == 'RIGHT':
+                current_game.move(1, 0)
+            elif action == 'DOWN':
+                current_game.move(0, 1)
+            elif action == 'ROTATE':
+                current_game.rotate_piece()
+        elif game_type == 'suika':
+            if action == 'LEFT':
+                current_game.move_drop_position('LEFT')
+            elif action == 'RIGHT':
+                current_game.move_drop_position('RIGHT')
+            elif action == 'SELECT':
+                current_game.drop_fruit()
+
+
+# Start IR remote reading if available
+if ir_remote:
+    try:
+        ir_remote.start_reading(handle_ir_button)
+        print("[IR] IR remote listening started")
+    except Exception as e:
+        print(f"[IR] Could not start IR remote: {e}")
+
+
 def game_state_broadcaster():
     """Broadcast game state to all connected clients"""
     global current_game

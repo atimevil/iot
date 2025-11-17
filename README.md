@@ -126,16 +126,59 @@ git clone [repository-url] iot
 cd iot
 ```
 
-### 3단계: Python 패키지 설치
+### 3단계: LIRC 설치 (IR 리모컨용)
+```bash
+# LIRC 설치
+sudo apt-get install lirc -y
+
+# LIRC 설정 편집
+sudo nano /etc/lirc/lirc_options.conf
+```
+
+**lirc_options.conf 설정:**
+```
+driver = default
+device = /dev/lirc0
+```
+
+**하드웨어 설정 (/boot/config.txt):**
+```bash
+sudo nano /boot/config.txt
+
+# 파일 끝에 추가:
+dtoverlay=gpio-ir,gpio_pin=18
+```
+
+**재부팅:**
+```bash
+sudo reboot
+```
+
+**IR 리모컨 학습 (CR2025):**
+```bash
+# IR 코드 기록
+sudo irrecord -d /dev/lirc0 ~/lircd.conf
+
+# 설정 복사
+sudo cp ~/lircd.conf /etc/lirc/lircd.conf
+
+# LIRC 재시작
+sudo systemctl restart lircd
+```
+
+### 4단계: Python 패키지 설치
 ```bash
 # requirements.txt에서 패키지 설치
 pip3 install -r requirements.txt
 
 # 수박게임용 물리 엔진 (필수)
 pip3 install pymunk==6.5.0
+
+# IR 리모컨 라이브러리 (필수)
+pip3 install python-lirc==2.0.1
 ```
 
-### 4단계: GPIO 권한 설정
+### 5단계: GPIO 권한 설정
 ```bash
 # 현재 사용자를 gpio 그룹에 추가
 sudo usermod -a -G gpio $USER
@@ -144,16 +187,18 @@ sudo usermod -a -G gpio $USER
 # 또는 임시로 sudo로 실행 가능
 ```
 
-### 5단계: 하드웨어 연결 확인
+### 6단계: 하드웨어 연결 확인
 ```bash
-# IR 리모컨 테스트
-python3 -c "from drivers.ir_driver import IRRemote; ir = IRRemote(); print('IR 리모컨 버튼을 눌러보세요...')"
+# LIRC 테스트 (IR 리모컨)
+irw
+# 리모컨 버튼을 누르면 코드가 표시됨
+# Ctrl+C로 종료
 
 # Buzzer 테스트
 python3 -c "from drivers.buzzer_driver import Buzzer; b = Buzzer(); b.beep(0.5)"
 ```
 
-### 6단계: 웹 서버 시작
+### 7단계: 웹 서버 시작
 ```bash
 cd ~/iot/web
 python3 app.py
@@ -171,7 +216,7 @@ Games: Snake (8x8), Tetris (8x16), Suika
  * Running on http://0.0.0.0:5000
 ```
 
-### 7단계: 게임 접속
+### 8단계: 게임 접속
 
 **같은 네트워크의 다른 기기에서:**
 1. 라즈베리파이 IP 확인:

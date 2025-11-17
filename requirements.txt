@@ -9,6 +9,9 @@ python-engineio==4.7.0
 # Raspberry Pi GPIO (for IR Receiver and Buzzer)
 RPi.GPIO==0.7.1
 
+# IR Remote support (LIRC)
+python-lirc==2.0.1
+
 # Physics engine for Suika game
 pymunk==6.5.0
 
