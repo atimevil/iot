@@ -18,7 +18,7 @@ class TetrisGame:
         'L': [[0, 0, 1], [1, 1, 1]]
     }
 
-    def __init__(self, width=10, height=20, difficulty='Normal'):
+    def __init__(self, width=8, height=16, difficulty='Normal'):
         self.width = width
         self.height = height
         self.difficulty = difficulty
@@ -29,6 +29,7 @@ class TetrisGame:
         self.current_x = 0
         self.current_y = 0
         self.score = 0
+        self.lines_cleared = 0
         self.game_over = False
         self.running = False
         self.lock = Lock()
@@ -114,18 +115,19 @@ class TetrisGame:
 
     def clear_lines(self):
         """Clear completed lines"""
-        lines_cleared = 0
+        new_lines_cleared = 0
         y = self.height - 1
 
         while y >= 0:
             if all(self.board[y]):
                 del self.board[y]
                 self.board.insert(0, [0] * self.width)
-                lines_cleared += 1
+                new_lines_cleared += 1
             else:
                 y -= 1
 
-        self.score += lines_cleared
+        self.lines_cleared += new_lines_cleared
+        self.score += new_lines_cleared * 10
 
     def update(self):
         """Update game state"""
@@ -140,21 +142,13 @@ class TetrisGame:
     def get_state(self):
         """Get current game state"""
         with self.lock:
-            # Create display board with current piece
-            display_board = [row[:] for row in self.board]
-
-            if self.current_piece:
-                for row_idx, row in enumerate(self.current_piece):
-                    for col_idx, cell in enumerate(row):
-                        if cell:
-                            y = self.current_y + row_idx
-                            x = self.current_x + col_idx
-                            if 0 <= y < self.height and 0 <= x < self.width:
-                                display_board[y][x] = 2  # 2 for current piece
-
             return {
-                'board': display_board,
+                'board': [row[:] for row in self.board],  # Send board without current piece
+                'current_piece': self.current_piece,
+                'current_x': self.current_x,
+                'current_y': self.current_y,
                 'score': self.score,
+                'lines_cleared': self.lines_cleared,
                 'game_over': self.game_over,
                 'width': self.width,
                 'height': self.height
@@ -165,6 +159,7 @@ class TetrisGame:
         with self.lock:
             self.board = [[0] * self.width for _ in range(self.height)]
             self.score = 0
+            self.lines_cleared = 0
             self.game_over = False
             self.spawn_piece()
 
@@ -176,11 +171,13 @@ class TetrisGame:
             if not self.game_over:
                 self.update()
 
-                if hardware:
-                    hardware['fnd'].set_score(self.score)
-                    if self.game_over:
-                        hardware['buzzer'].game_over_sound()
-                        hardware['led'].game_over_effect()
+                # Update hardware if available (buzzer only for now)
+                if hardware and hasattr(hardware, 'beep'):
+                    try:
+                        if self.game_over:
+                            hardware.beep(0.2)  # Game over sound
+                    except:
+                        pass  # Ignore hardware errors
 
             time.sleep(self.speed)
 

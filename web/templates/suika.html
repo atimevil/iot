@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Game - 8x8</title>
+    <title>수박게임 - Suika Game</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -30,12 +30,42 @@
             font-size: 1.2em;
         }
         .score { color: #667eea; font-weight: bold; }
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+        }
         canvas {
             border: 3px solid #667eea;
             border-radius: 10px;
             display: block;
             margin: 0 auto 20px;
             background: #f5f5f5;
+        }
+        .drop-indicator {
+            position: absolute;
+            top: 30px;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 15px solid #e74c3c;
+            transform: translateX(-50%);
+            pointer-events: none;
+            z-index: 10;
+        }
+        .next-fruit {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 10px;
+        }
+        .next-fruit-preview {
+            display: inline-block;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 10px auto;
         }
         .controls {
             display: flex;
@@ -56,16 +86,6 @@
         .btn-home { background: #95a5a6; color: white; }
         .btn-reset { background: #f39c12; color: white; }
         .btn-start { background: #27ae60; color: white; }
-        .difficulty-select {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .difficulty-select select {
-            padding: 10px;
-            font-size: 1em;
-            border-radius: 5px;
-            border: 2px solid #667eea;
-        }
         .game-over {
             display: none;
             position: fixed;
@@ -80,7 +100,12 @@
             z-index: 1000;
         }
         .game-over h2 { color: #e74c3c; margin-bottom: 20px; font-size: 2em; }
-        .game-over .final-score { font-size: 1.5em; margin-bottom: 20px; }
+        .instructions {
+            text-align: center;
+            margin-top: 15px;
+            color: #666;
+            font-size: 0.9em;
+        }
         .modal {
             display: none;
             position: fixed;
@@ -137,28 +162,38 @@
             font-size: 1em;
             cursor: pointer;
         }
+        .danger-line {
+            position: absolute;
+            top: 100px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: rgba(231, 76, 60, 0.5);
+            border-top: 2px dashed #e74c3c;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <h1>🐍 Snake Game (8x8)</h1>
-        
-        <div class="difficulty-select">
-            <label>난이도: </label>
-            <select id="difficulty">
-                <option value="Easy">Easy</option>
-                <option value="Normal" selected>Normal</option>
-                <option value="Hard">Hard</option>
-            </select>
-        </div>
-        
+        <h1>🍉 수박게임 (Suika Game)</h1>
+
         <div class="game-info">
             <div>점수: <span id="score" class="score">0</span></div>
-            <div>난이도: <span id="current-difficulty" class="score">Normal</span></div>
         </div>
-        
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
-        
+
+        <div class="next-fruit">
+            <div>다음 과일</div>
+            <div id="nextFruitPreview" class="next-fruit-preview"></div>
+            <div id="nextFruitName"></div>
+        </div>
+
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="400" height="600"></canvas>
+            <div class="drop-indicator" id="dropIndicator"></div>
+            <div class="danger-line"></div>
+        </div>
+
         <div class="controls">
             <button class="btn-home" onclick="window.location.href='/'">🏠 메인</button>
             <button class="btn-start" onclick="showNicknameModal()">▶️ 시작</button>
@@ -177,6 +212,10 @@
             </div>
         </div>
 
+        <div class="instructions">
+            ←/→: 위치 이동 | ↓/선택: 과일 떨어뜨리기
+        </div>
+
         <div class="game-over" id="gameOver">
             <h2>Game Over!</h2>
             <p class="final-score">최종 점수: <span id="finalScore">0</span></p>
@@ -188,8 +227,14 @@
         const socket = io();
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const cellSize = 50;
+        const dropIndicator = document.getElementById('dropIndicator');
         let gameStarted = false;
+        let lastDropTime = 0;
+        const DROP_COOLDOWN = 150;  // 150ms = ~6.6 drops per second
+
+        // Track currently pressed keys for smooth movement
+        const keysPressed = new Set();
+        let movementInterval = null;
         let playerName = '';
 
         function showNicknameModal() {
@@ -214,12 +259,9 @@
         }
 
         function startGame() {
-            const difficulty = document.getElementById('difficulty').value;
-            document.getElementById('current-difficulty').textContent = difficulty;
-
             socket.emit('start_game', {
-                game: 'snake',
-                difficulty: difficulty,
+                game: 'suika',
+                difficulty: 'Normal',
                 player_name: playerName || 'Player'
             });
             gameStarted = true;
@@ -243,43 +285,64 @@
             ctx.fillStyle = '#f5f5f5';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw grid
+            // Draw container boundaries
             ctx.strokeStyle = '#ddd';
-            for (let i = 0; i <= 8; i++) {
-                ctx.beginPath();
-                ctx.moveTo(i * cellSize, 0);
-                ctx.lineTo(i * cellSize, canvas.height);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(0, i * cellSize);
-                ctx.lineTo(canvas.width, i * cellSize);
-                ctx.stroke();
-            }
+            ctx.lineWidth = 2;
+            ctx.strokeRect(0, 0, canvas.width, canvas.height);
 
-            // Draw food
-            if (state.food) {
-                ctx.fillStyle = '#e74c3c';
-                ctx.beginPath();
-                ctx.arc(
-                    state.food[0] * cellSize + cellSize/2,
-                    state.food[1] * cellSize + cellSize/2,
-                    cellSize/2 - 5,
-                    0, Math.PI * 2
-                );
-                ctx.fill();
-            }
+            // Draw danger line
+            ctx.strokeStyle = 'rgba(231, 76, 60, 0.3)';
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, 100);
+            ctx.lineTo(canvas.width, 100);
+            ctx.stroke();
+            ctx.setLineDash([]);
 
-            // Draw snake
-            if (state.snake) {
-                state.snake.forEach((segment, index) => {
-                    ctx.fillStyle = index === 0 ? '#27ae60' : '#2ecc71';
-                    ctx.fillRect(
-                        segment[0] * cellSize + 2,
-                        segment[1] * cellSize + 2,
-                        cellSize - 4,
-                        cellSize - 4
+            // Draw all fruits
+            if (state.fruits && state.fruits.length > 0) {
+                state.fruits.forEach(fruit => {
+                    // Draw fruit circle
+                    ctx.fillStyle = fruit.color;
+                    ctx.beginPath();
+                    ctx.arc(
+                        fruit.x,
+                        fruit.y,
+                        fruit.size,
+                        0,
+                        Math.PI * 2
                     );
+                    ctx.fill();
+
+                    // Draw fruit outline
+                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Draw fruit name (for small fruits)
+                    if (fruit.size < 30) {
+                        ctx.fillStyle = 'white';
+                        ctx.font = 'bold 10px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(fruit.name.charAt(0).toUpperCase(), fruit.x, fruit.y);
+                    }
                 });
+            }
+
+            // Update drop indicator position
+            if (state.drop_x !== undefined) {
+                dropIndicator.style.left = state.drop_x + 'px';
+            }
+
+            // Update next fruit preview
+            if (state.next_fruit) {
+                const nextPreview = document.getElementById('nextFruitPreview');
+                const nextName = document.getElementById('nextFruitName');
+                nextPreview.style.backgroundColor = state.next_fruit.color;
+                nextPreview.style.width = (state.next_fruit.size * 2) + 'px';
+                nextPreview.style.height = (state.next_fruit.size * 2) + 'px';
+                nextName.textContent = state.next_fruit.name;
             }
 
             // Update score
@@ -292,38 +355,103 @@
                 gameStarted = false;
 
                 // Save score to database
-                const difficulty = document.getElementById('difficulty').value;
                 socket.emit('save_score', {
-                    game: 'snake',
+                    game: 'suika',
                     player_name: playerName || 'Player',
                     score: state.score || 0,
-                    difficulty: difficulty
+                    difficulty: null
                 });
             }
         });
 
-        // Hide game over screen on page load
-        window.addEventListener('load', () => {
-            document.getElementById('gameOver').style.display = 'none';
-        });
+        // Start continuous movement when key is pressed
+        function startMovement() {
+            if (movementInterval) return;  // Already running
+
+            movementInterval = setInterval(() => {
+                if (!gameStarted) {
+                    stopMovement();
+                    return;
+                }
+
+                // Send movement commands for currently pressed keys
+                if (keysPressed.has('ArrowLeft')) {
+                    socket.emit('game_input', {
+                        game: 'suika',
+                        action: 'LEFT'
+                    });
+                }
+                if (keysPressed.has('ArrowRight')) {
+                    socket.emit('game_input', {
+                        game: 'suika',
+                        action: 'RIGHT'
+                    });
+                }
+            }, 50);  // Send movement command every 50ms for smooth movement
+        }
+
+        function stopMovement() {
+            if (movementInterval) {
+                clearInterval(movementInterval);
+                movementInterval = null;
+            }
+        }
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
             if (!gameStarted) return;
 
             const keyMap = {
-                'ArrowUp': 'UP',
-                'ArrowDown': 'DOWN',
+                'ArrowLeft': 'LEFT',
+                'ArrowRight': 'RIGHT',
+                'ArrowDown': 'SELECT',
+                'Enter': 'SELECT',
+                ' ': 'SELECT'
+            };
+
+            if (keyMap[e.key]) {
+                e.preventDefault();
+
+                if (keyMap[e.key] === 'LEFT' || keyMap[e.key] === 'RIGHT') {
+                    // Add key to pressed set
+                    keysPressed.add(e.key);
+
+                    // Immediate movement on first press
+                    socket.emit('game_input', {
+                        game: 'suika',
+                        action: keyMap[e.key]
+                    });
+
+                    // Start continuous movement
+                    startMovement();
+                } else if (keyMap[e.key] === 'SELECT') {
+                    // Drop fruit with cooldown to prevent too rapid drops
+                    const now = Date.now();
+                    if (now - lastDropTime >= DROP_COOLDOWN) {
+                        socket.emit('game_input', {
+                            game: 'suika',
+                            action: 'SELECT'
+                        });
+                        lastDropTime = now;
+                    }
+                }
+            }
+        });
+
+        // Stop movement when key is released
+        document.addEventListener('keyup', (e) => {
+            const keyMap = {
                 'ArrowLeft': 'LEFT',
                 'ArrowRight': 'RIGHT'
             };
 
             if (keyMap[e.key]) {
-                e.preventDefault();
-                socket.emit('game_input', {
-                    game: 'snake',
-                    action: keyMap[e.key]
-                });
+                keysPressed.delete(e.key);
+
+                // Stop movement if no arrow keys are pressed
+                if (!keysPressed.has('ArrowLeft') && !keysPressed.has('ArrowRight')) {
+                    stopMovement();
+                }
             }
         });
 

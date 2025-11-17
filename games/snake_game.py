@@ -7,7 +7,7 @@ from threading import Thread, Lock
 class SnakeGame:
     """Snake Game Logic"""
 
-    def __init__(self, width=16, height=16, difficulty='Normal'):
+    def __init__(self, width=8, height=8, difficulty='Normal'):
         self.width = width
         self.height = height
         self.difficulty = difficulty
@@ -118,14 +118,13 @@ class SnakeGame:
             if not self.game_over:
                 self.update()
 
-                # Update hardware if available
-                if hardware:
-                    hardware['fnd'].set_score(self.score)
-                    if self.game_over:
-                        hardware['buzzer'].game_over_sound()
-                        hardware['led'].game_over_effect()
-                    elif self.score > 0:
-                        hardware['buzzer'].score_sound()
+                # Update hardware if available (buzzer only for now)
+                if hardware and hasattr(hardware, 'beep'):
+                    try:
+                        if self.game_over:
+                            hardware.beep(0.2)  # Game over sound
+                    except:
+                        pass  # Ignore hardware errors
 
             time.sleep(self.speed)
 

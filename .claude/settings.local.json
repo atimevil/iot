@@ -6,7 +6,18 @@
       "Bash(claude mcp add-json:*)",
       "Bash(claude mcp:*)",
       "Bash(uvx:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(python app.py:*)",
+      "mcp__serena__list_memories",
+      "Bash(python3:*)",
+      "mcp__serena__list_dir",
+      "Bash(python:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(nul)",
+      "Bash(timeout /t 3 /nobreak)",
+      "Bash(pip install:*)",
+      "Bash(del \"C:\\Users\\atime\\OneDrive\\바탕 화면\\iot\\test_suika.py\" 2)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": []

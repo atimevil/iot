@@ -23,10 +23,21 @@ A game console system using Raspberry Pi 4 and Arduino Full Kit EK100, featuring
 iot/
 ├── config/           # Hardware pin configurations
 ├── drivers/          # Hardware device drivers
+├── database/         # SQLite database and models
+│   ├── models.py    # Database interface
+│   └── game_scores.db  # Score database (auto-generated)
 ├── games/            # Game logic modules
+│   ├── snake_game.py
+│   ├── tetris_game.py
+│   └── suika_game.py
 └── web/             # Flask web application
     ├── app.py       # Main application
     └── templates/   # HTML game interfaces
+        ├── index.html
+        ├── snake.html
+        ├── tetris.html
+        ├── suika.html
+        └── scoreboard.html
 ```
 
 ## Development Commands
@@ -99,14 +110,41 @@ sudo usermod -a -G gpio,i2c $USER
 - Flask-SocketIO provides real-time bidirectional communication
 - Game state broadcast at 20 FPS to all connected clients
 - Client-side Canvas rendering with keyboard/IR remote input
+- Nickname input modal before game start (all games)
+- Auto-save score to database on game over
+
+### Database Layer
+- **SQLite**: Lightweight database for score persistence
+- **models.py**: Database interface with CRUD operations
+- **Auto-initialization**: Database created on first run
+- **Score tracking**: Player name, game, score, difficulty, timestamp
 
 ### Communication Flow
 ```
-User Input (Web/IR) → Flask-SocketIO → Game Logic →
-Hardware Feedback (LCD/Buzzer/LED/FND) + Web State Update → Canvas Rendering
+1. Game Start Flow:
+   User clicks Start → Nickname Modal → Enter Name →
+   start_game event → Game initialized with player_name
+
+2. Gameplay Flow:
+   User Input (Web/IR) → game_input event → Game Logic Update →
+   game_state broadcast (20 FPS) → Canvas Rendering
+
+3. Game Over Flow:
+   Game Over Detected → save_score event →
+   Database Save → Scoreboard Update
 ```
 
 ## Key Components
+
+### Database (`database/models.py`)
+- **DatabaseManager**: Singleton class for database operations
+- **Schema**: scores table (id, game, player_name, score, difficulty, timestamp)
+- **Methods**:
+  - `add_score(game, player_name, score, difficulty)`: Insert new score
+  - `get_top_scores(game, limit, difficulty)`: Get top N scores for a game
+  - `get_all_top_scores(limit)`: Get top N scores across all games
+  - `get_game_stats(game)`: Get statistics for a game
+  - `get_all_stats()`: Get overall statistics
 
 ### Pin Configuration (`config/pins.py`)
 - Centralized GPIO pin assignments
@@ -135,18 +173,32 @@ Hardware Feedback (LCD/Buzzer/LED/FND) + Web State Update → Canvas Rendering
 - Collision detection and piece locking
 - Game over detection at spawn
 
-**Flappy Bird Game** (`games/flappy_bird_game.py`)
-- Physics-based bird movement (gravity, velocity)
-- Procedural pipe generation
-- Collision detection (pipe, ground, ceiling)
-- Score on pipe passage
+**Suika Game** (`games/suika_game.py`)
+- Physics-based fruit merging using Pymunk engine
+- 10 fruit types (cherry → watermelon)
+- Gravity and collision simulation
+- Merge detection and scoring system
+- Game over when fruits overflow danger line
 
 ### WebSocket Events
-- `start_game`: Initialize game with difficulty
+
+**Client → Server:**
+- `start_game`: Initialize game with difficulty and player name
+  - Parameters: `{game, difficulty, player_name}`
 - `game_input`: Handle keyboard/IR input
+  - Parameters: `{game, action}`
 - `reset_game`: Restart current game
 - `stop_game`: Stop game and cleanup
-- `game_state`: Broadcast current game state (server → client)
+- `save_score`: Save score to database
+  - Parameters: `{game, player_name, score, difficulty}`
+
+**Server → Client:**
+- `game_state`: Broadcast current game state (20 FPS)
+- `game_started`: Confirm game initialization
+- `game_reset`: Confirm game reset
+- `game_stopped`: Confirm game stopped with final score
+- `score_saved`: Confirm score saved to database
+- `error`: Error message
 
 ## Hardware Configuration
 
@@ -205,6 +257,17 @@ Adjust timing in `DIFFICULTY_SPEEDS` dict for game balance
 - FND is disabled, score shows in web interface only
 - Check browser console for WebSocket errors
 - Verify `game_state` event includes score field
+
+**Nickname Not Required**
+- All games now require nickname input before starting
+- Nickname modal appears when clicking "▶️ 시작" button
+- Press Enter or click "시작" to confirm nickname
+
+**Score Not Saving to Database**
+- Check database file exists: `database/game_scores.db`
+- Verify `save_score` event is emitted on game over
+- Check player_name is not empty
+- Review Flask console for database errors
 
 ## Code Style
 
