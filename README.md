@@ -13,14 +13,17 @@ IoT 시스템 응용 - 5조 팀 프로젝트
 - 🐦 **Flappy Bird**: 파이프 피하기 게임
 
 ### 사용 하드웨어
+
+**활성화된 하드웨어:**
 - 라즈베리 파이 4
 - 16x2 I2C LCD 디스플레이
-- 8x8 도트 매트릭스 (MAX7219)
+- 8x8 도트 매트릭스 (1088BS+) - 16핀 직접 연결
 - IR 리모컨 및 수신기
-- 7-Segment FND (4자리)
 - 부저 (Buzzer)
-- RGB LED
-- 버튼 스위치
+
+**비활성화 (웹 화면으로 대체):**
+- 7-Segment FND → 웹에서 점수 표시
+- RGB LED → 웹에서 시각 효과 표시
 
 ## 프로젝트 구조
 
@@ -65,11 +68,10 @@ sudo apt-get install python3-smbus i2c-tools
 sudo apt-get install python3-rpi.gpio
 ```
 
-### 3. I2C 및 SPI 활성화
+### 3. I2C 활성화
 ```bash
 sudo raspi-config
 # Interface Options -> I2C -> Enable
-# Interface Options -> SPI -> Enable
 ```
 
 ### 4. 프로젝트 클론 및 의존성 설치
@@ -97,23 +99,31 @@ pip3 install -r requirements.txt
 - Positive -> GPIO 23 (Pin 16)
 - Negative -> GND
 
-### RGB LED
-- Red -> GPIO 17 (Pin 11)
-- Green -> GPIO 27 (Pin 13)
-- Blue -> GPIO 22 (Pin 15)
-- Common -> GND (공통 음극)
+### 8x8 Dot Matrix 1088BS+ (16핀 직접 연결)
 
-### 7-Segment FND (Shift Register 사용)
-- Data -> GPIO 24 (Pin 18)
-- Latch -> GPIO 25 (Pin 22)
-- Clock -> GPIO 8 (Pin 24)
+**Row Pins (Anode, +)** - 행 선택
+- Row 0 -> GPIO 4 (Pin 7)
+- Row 1 -> GPIO 17 (Pin 11)
+- Row 2 -> GPIO 27 (Pin 13)
+- Row 3 -> GPIO 22 (Pin 15)
+- Row 4 -> GPIO 5 (Pin 29)
+- Row 5 -> GPIO 6 (Pin 31)
+- Row 6 -> GPIO 13 (Pin 33)
+- Row 7 -> GPIO 19 (Pin 35)
 
-### 8x8 Dot Matrix (MAX7219)
-- DIN -> GPIO 10 (MOSI, Pin 19)
-- CS -> GPIO 9 (Pin 21)
-- CLK -> GPIO 11 (SCLK, Pin 23)
-- VCC -> 5V
-- GND -> GND
+**Column Pins (Cathode, -)** - 열 데이터
+- Col 0 -> GPIO 26 (Pin 37)
+- Col 1 -> GPIO 12 (Pin 32)
+- Col 2 -> GPIO 16 (Pin 36)
+- Col 3 -> GPIO 20 (Pin 38)
+- Col 4 -> GPIO 21 (Pin 40)
+- Col 5 -> GPIO 7 (Pin 26)
+- Col 6 -> GPIO 8 (Pin 24)
+- Col 7 -> GPIO 25 (Pin 22)
+
+### 비활성화된 하드웨어
+- **RGB LED**: 제거됨 (웹 화면에서 효과 표시)
+- **7-Segment FND**: 제거됨 (웹 화면에서 점수 표시)
 
 ## 실행 방법
 
@@ -164,13 +174,16 @@ http://localhost:5000
 
 ## 하드웨어 피드백
 
-게임 플레이 중 다음과 같은 하드웨어 피드백이 제공됩니다:
+게임 플레이 중 다음과 같은 피드백이 제공됩니다:
 
+**하드웨어:**
 - **LCD**: 현재 게임 이름과 난이도 표시
-- **FND**: 실시간 점수 표시
-- **도트 매트릭스**: 게임 화면 간략 표시
+- **도트 매트릭스 (1088BS+)**: 게임 화면 8x8 LED로 시각화
 - **부저**: 점수 획득 시 효과음, 게임 오버 시 멜로디
-- **LED**: 게임 시작/종료 시 효과
+
+**웹 인터페이스:**
+- **점수 표시**: 실시간 점수 업데이트
+- **시각 효과**: 게임 시작/종료 시 화면 효과
 
 ## 문제 해결
 
@@ -182,11 +195,22 @@ I2C 주소 확인 후 `config/pins.py`에서 `LCD_I2C_ADDRESS` 수정
 
 ### GPIO 권한 오류
 ```bash
-sudo usermod -a -G gpio $USER
-sudo usermod -a -G i2c $USER
-sudo usermod -a -G spi $USER
+sudo usermod -a -G gpio,i2c $USER
 # 재로그인 필요
 ```
+
+### 도트 매트릭스가 제대로 표시되지 않을 때
+```bash
+# 개별 픽셀 테스트
+python3 -c "from drivers.dotmatrix_driver import DotMatrix; dm = DotMatrix(); dm.display_pixel(4, 4); import time; time.sleep(3); dm.cleanup()"
+
+# 숫자 표시 테스트
+python3 -c "from drivers.dotmatrix_driver import DotMatrix; dm = DotMatrix(); dm.display_number(8); import time; time.sleep(3); dm.cleanup()"
+```
+- 16개 핀 연결 확인 (8 Row + 8 Column)
+- Row 핀: Anode(+) 연결 확인
+- Column 핀: Cathode(-) 연결 확인
+- 전원 공급 확인
 
 ### 포트가 이미 사용 중일 때
 ```bash
